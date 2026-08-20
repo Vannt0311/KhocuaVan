@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Đồng Hồ Sáu Mũ Tư Duy</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>🎩 Đồng Hồ Sáu Mũ Tư Duy</h1>
+    <p class="subtitle">Điều phối buổi thảo luận theo phương pháp De Bono</p>
+  </header>
+
+  <main>
+    <section class="hats" id="hats"></section>
+
+    <section class="panel" id="panel">
+      <div class="panel-empty" id="panelEmpty">
+        👆 Chọn một chiếc mũ để bắt đầu
+      </div>
+
+      <div class="panel-active" id="panelActive" hidden>
+        <div class="panel-header">
+          <h2 id="hatTitle"></h2>
+          <p id="hatPrompt"></p>
+        </div>
+
+        <div class="timer-row">
+          <div class="timer-display" id="timerDisplay">03:00</div>
+          <div class="timer-controls">
+            <label>
+              Phút:
+              <input type="number" id="minutesInput" min="1" max="30" value="3">
+            </label>
+            <button id="startBtn" class="btn primary">▶ Bắt đầu</button>
+            <button id="pauseBtn" class="btn" disabled>⏸ Tạm dừng</button>
+            <button id="resetBtn" class="btn">↺ Đặt lại</button>
+          </div>
+        </div>
+
+        <textarea id="notesInput" placeholder="Ghi chú ý kiến của học sinh dưới mũ này..."></textarea>
+      </div>
+    </section>
+
+    <section class="actions">
+      <button id="exportBtn" class="btn primary">📄 Xuất tóm tắt buổi học</button>
+      <button id="clearBtn" class="btn danger">🗑 Xóa toàn bộ phiên</button>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
