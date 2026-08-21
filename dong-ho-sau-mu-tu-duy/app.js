@@ -1,3 +1,23 @@
+/* ============================================================
+   ĐỒNG HỒ SÁU MŨ TƯ DUY
+   Bố cục file:
+     1. Dữ liệu cấu hình
+     2. Trạng thái & lưu trữ
+     3. Tiện ích
+     4. Giao diện lưới mũ
+     5. Đồng hồ đếm ngược
+     6. Chuông báo hết giờ
+     7. Xuất tóm tắt
+     8. Gắn sự kiện & khởi động
+   ============================================================ */
+
+
+/* ------------------------------------------------------------
+   1. DỮ LIỆU CẤU HÌNH
+   Nguồn duy nhất sinh ra cả giao diện lẫn nội dung file xuất.
+   Muốn đổi tên mũ, câu gợi ý hay màu — sửa ở đây, không sửa DOM.
+   ------------------------------------------------------------ */
+
 const HATS = [
   {
     id: "white",
@@ -43,32 +63,57 @@ const HATS = [
   },
 ];
 
+
+/* ------------------------------------------------------------
+   2. TRẠNG THÁI & LƯU TRỮ
+   Chỉ notes / minutes / secondsSpent được lưu. Trạng thái đồng hồ
+   đang chạy thì không — tải lại trang là đồng hồ về mốc ban đầu.
+   ------------------------------------------------------------ */
+
 const STORAGE_KEY = "sau-mu-tu-duy-session";
 
-let state = loadState();
-let activeHatId = null;
-let timer = { remaining: 0, total: 0, running: false, intervalId: null };
-let audioCtx = null;
+function defaultHatState() {
+  return { notes: "", minutes: 3, secondsSpent: 0 };
+}
 
+// Luôn hợp nhất dữ liệu đã lưu với mặc định của đủ 6 mũ, để phiên cũ
+// trong localStorage không tạo ra ô undefined khi danh sách mũ đổi.
 function loadState() {
+  let saved = {};
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) saved = JSON.parse(raw) || {};
   } catch (e) {}
-  const initial = {};
-  HATS.forEach((h) => (initial[h.id] = { notes: "", minutes: 3, secondsSpent: 0 }));
-  return initial;
+
+  const merged = {};
+  HATS.forEach((hat) => {
+    merged[hat.id] = Object.assign(defaultHatState(), saved[hat.id]);
+  });
+  return merged;
 }
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
+let state = loadState();
+let activeHatId = null;
+
+
+/* ------------------------------------------------------------
+   3. TIỆN ÍCH
+   ------------------------------------------------------------ */
+
 function fmt(seconds) {
   const m = Math.floor(seconds / 60).toString().padStart(2, "0");
   const s = Math.floor(seconds % 60).toString().padStart(2, "0");
   return `${m}:${s}`;
 }
+
+
+/* ------------------------------------------------------------
+   4. GIAO DIỆN LƯỚI MŨ
+   ------------------------------------------------------------ */
 
 function renderHats() {
   const container = document.getElementById("hats");
@@ -111,6 +156,13 @@ function selectHat(hatId) {
   renderHats();
 }
 
+
+/* ------------------------------------------------------------
+   5. ĐỒNG HỒ ĐẾM NGƯỢC
+   ------------------------------------------------------------ */
+
+let timer = { remaining: 0, total: 0, running: false, intervalId: null };
+
 function updateTimerDisplay() {
   const el = document.getElementById("timerDisplay");
   el.textContent = fmt(timer.remaining);
@@ -121,6 +173,48 @@ function setTimerButtons(running) {
   document.getElementById("startBtn").disabled = running;
   document.getElementById("pauseBtn").disabled = !running;
 }
+
+function startTimer() {
+  if (!activeHatId) return;
+  // Hết giờ rồi mà bấm Bắt đầu thì chạy lại một vòng mới cho mũ này,
+  // thay vì đếm xuống số âm và reo chuông ngay lập tức.
+  if (timer.remaining <= 0) {
+    timer.remaining = timer.total;
+    updateTimerDisplay();
+  }
+  timer.running = true;
+  setTimerButtons(true);
+  timer.intervalId = setInterval(() => {
+    timer.remaining -= 1;
+    if (state[activeHatId]) {
+      state[activeHatId].secondsSpent = (state[activeHatId].secondsSpent || 0) + 1;
+      saveState();
+      renderHats();
+    }
+    updateTimerDisplay();
+    if (timer.remaining <= 0) {
+      clearInterval(timer.intervalId);
+      timer.running = false;
+      setTimerButtons(false);
+      playChime();
+    }
+  }, 1000);
+}
+
+function stopTimer(resetDisplay) {
+  clearInterval(timer.intervalId);
+  timer.running = false;
+  setTimerButtons(false);
+  if (resetDisplay) updateTimerDisplay();
+}
+
+
+/* ------------------------------------------------------------
+   6. CHUÔNG BÁO HẾT GIỜ
+   Dựng bằng Web Audio API để không phải kéo file âm thanh về.
+   ------------------------------------------------------------ */
+
+let audioCtx = null;
 
 function playChime() {
   try {
@@ -141,36 +235,39 @@ function playChime() {
   } catch (e) {}
 }
 
-function startTimer() {
-  if (!activeHatId) return;
-  timer.running = true;
-  setTimerButtons(true);
-  timer.intervalId = setInterval(() => {
-    timer.remaining -= 1;
-    if (state[activeHatId]) {
-      state[activeHatId].secondsSpent = (state[activeHatId].secondsSpent || 0) + 1;
-      saveState();
-      renderHats();
-      document.querySelectorAll(".hat-card").forEach((c) => {
-        if (c.classList.contains(HATS.find((h) => h.id === activeHatId).cls)) c.classList.add("active");
-      });
-    }
-    updateTimerDisplay();
-    if (timer.remaining <= 0) {
-      clearInterval(timer.intervalId);
-      timer.running = false;
-      setTimerButtons(false);
-      playChime();
-    }
-  }, 1000);
+
+/* ------------------------------------------------------------
+   7. XUẤT TÓM TẮT
+   ------------------------------------------------------------ */
+
+function buildSummaryText(now) {
+  const dateStr = now.toLocaleDateString("vi-VN");
+  let text = `TÓM TẮT BUỔI THẢO LUẬN — SÁU MŨ TƯ DUY\nNgày: ${dateStr}\n\n`;
+  HATS.forEach((hat) => {
+    const data = state[hat.id];
+    text += `${hat.emoji} ${hat.name}\n`;
+    text += `Thời gian: ${fmt(data.secondsSpent || 0)}\n`;
+    text += `Ghi chú:\n${data.notes && data.notes.trim() ? data.notes.trim() : "(chưa có ghi chú)"}\n\n`;
+  });
+  return text;
 }
 
-function stopTimer(resetDisplay) {
-  clearInterval(timer.intervalId);
-  timer.running = false;
-  setTimerButtons(false);
-  if (resetDisplay) updateTimerDisplay();
+function downloadText(filename, text) {
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
+
+
+/* ------------------------------------------------------------
+   8. GẮN SỰ KIỆN & KHỞI ĐỘNG
+   ------------------------------------------------------------ */
 
 document.getElementById("startBtn").addEventListener("click", startTimer);
 
@@ -206,29 +303,13 @@ document.getElementById("notesInput").addEventListener("input", (e) => {
 
 document.getElementById("exportBtn").addEventListener("click", () => {
   const now = new Date();
-  const dateStr = now.toLocaleDateString("vi-VN");
-  let text = `TÓM TẮT BUỔI THẢO LUẬN — SÁU MŨ TƯ DUY\nNgày: ${dateStr}\n\n`;
-  HATS.forEach((hat) => {
-    const data = state[hat.id];
-    text += `${hat.emoji} ${hat.name}\n`;
-    text += `Thời gian: ${fmt(data.secondsSpent || 0)}\n`;
-    text += `Ghi chú:\n${data.notes && data.notes.trim() ? data.notes.trim() : "(chưa có ghi chú)"}\n\n`;
-  });
-  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `tom-tat-sau-mu-tu-duy-${now.toISOString().slice(0, 10)}.txt`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  downloadText(`tom-tat-sau-mu-tu-duy-${now.toISOString().slice(0, 10)}.txt`, buildSummaryText(now));
 });
 
 document.getElementById("clearBtn").addEventListener("click", () => {
   if (!confirm("Xóa toàn bộ ghi chú và thời gian của phiên hiện tại?")) return;
   stopTimer(false);
-  HATS.forEach((h) => (state[h.id] = { notes: "", minutes: 3, secondsSpent: 0 }));
+  HATS.forEach((hat) => (state[hat.id] = defaultHatState()));
   saveState();
   activeHatId = null;
   document.getElementById("panelEmpty").hidden = false;
