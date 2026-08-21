@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Không có bước build, không có package manager, không có dependency, không có test runner. Các công cụ là HTML/CSS/JS thuần chạy thẳng trên trình duyệt.
 
-- Mở trực tiếp: mở `dong-ho-sau-mu-tu-duy/index.html` bằng trình duyệt.
+- **Cách chính** — mở trực tiếp: nhấp đúp `dong-ho-sau-mu-tu-duy/index.html`. Không cần cài đặt gì.
 - Chạy qua server tĩnh (cần khi thử localStorage/`file://` gây lỗi):
 
 ```bash
@@ -19,7 +19,23 @@ python -m http.server 8000
 
 Sau đó vào `http://localhost:8000/dong-ho-sau-mu-tu-duy/`.
 
+### ⚠️ Ràng buộc môi trường
+
+**Máy của người dùng chưa cài Python lẫn Node.js.** Kiểm tra ngày 21-08-2026: cả `python --version` lẫn `node --version` đều báo không tìm thấy lệnh. Nghĩa là lệnh `python -m http.server` ở trên **hiện chạy không được**, và mọi công cụ trong repo bắt buộc phải chạy trọn vẹn bằng `file://`.
+
+Hệ quả — tránh các kỹ thuật đòi hỏi giao thức HTTP, vì chúng hỏng lặng lẽ trên `file://`:
+
+- `<script type="module">` cùng `import`/`export` — bị chặn bởi CORS, kết quả là **trang trắng không kèm thông báo lỗi rõ ràng**.
+- `fetch()` hay `XMLHttpRequest` đọc file cùng thư mục (JSON, SVG, dữ liệu ngoài) — cùng lý do.
+- Service worker và Web Worker nạp từ file rời.
+
+Nếu một công cụ mới thật sự cần những thứ trên, phải cài Python hoặc Node trước, và ghi rõ yêu cầu đó vào README của công cụ.
+
+### Kiểm thử
+
 Kiểm thử là thủ công: bấm qua từng mũ, chạy hẹn giờ tới 0 (nghe chuông), tải lại trang để xác nhận ghi chú còn trong localStorage, bấm "Xuất tóm tắt" và "Xóa toàn bộ phiên".
+
+Khi cần chạy tự động mà không có server: dựng một file HTML tạm nội tuyến hoá `style.css` và `app.js` vào thẳng `index.html`, mở bằng `file://` rồi gọi trực tiếp các hàm trong trang. Xóa file tạm sau khi xong. Lưu ý localStorage có thể bị chặn tuỳ ngữ cảnh tải trang, nên bộ kiểm thử cần một lớp giả lập localStorage dự phòng.
 
 ## Kiến trúc
 
